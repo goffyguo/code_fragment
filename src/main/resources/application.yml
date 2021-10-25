@@ -1,0 +1,16 @@
+server:
+  port: 8000
+
+
+
+
+
+
+
+ali:
+  oss:
+    endponit:
+    accessKeyId:
+    accessKeySecret:
+    bucketName:
+    outsideWebAddress:
