@@ -38,7 +38,8 @@ public class RealNameAuthentication {
 
 
     public  boolean realNameAuthentication(IdimageVerifyDTO idimageVerifyDTO) throws Exception{
-
+        BASE64Encoder encoder = new BASE64Encoder();
+        String encode = encoder.encode(idimageVerifyDTO.getIdImageFront().getBytes());
 
         // 生成新的文件名称防止文件名冲突发生文件覆盖
         String idImageFrontImg = IdUtil.simpleUUID() + "." + FileUtil.getSuffix( idimageVerifyDTO.getIdImageFront().getOriginalFilename());
@@ -64,7 +65,7 @@ public class RealNameAuthentication {
         String ID_CARD_OCR_IDENTIFICATION_KEY = "";
         String ID_CARD_OCR_IDENTIFICATION_URL = "";
         requestBody.add("key",ID_CARD_OCR_IDENTIFICATION_KEY);
-        requestBody.add("image",imgStr);
+        requestBody.add("image",encode);
         requestBody.add("side","front");
         HttpEntity<MultiValueMap> requestEntity = new HttpEntity<>(requestBody, requestHeaders);
         IdentityAuthenticationDTO authenticationDTO = restTemplate.exchange(
