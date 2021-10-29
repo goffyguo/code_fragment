@@ -38,6 +38,8 @@ public class RealNameAuthentication {
 
 
     public  boolean realNameAuthentication(IdimageVerifyDTO idimageVerifyDTO) throws Exception{
+        log.info("实名认证上传图片正面的大小(MB)为->{}",idimageVerifyDTO.getIdImageFront().getSize()/(1024.0*1024.0));
+        log.info("实名认证上传图片背面的大小(MB)为->{}",idimageVerifyDTO.getIdImageBack().getSize()/(1024.0*1024.0));
         BASE64Encoder encoder = new BASE64Encoder();
         String encode = encoder.encode(idimageVerifyDTO.getIdImageFront().getBytes());
 
@@ -77,37 +79,58 @@ public class RealNameAuthentication {
         String reason = authenticationDTO.getReason();
         IdOcrVerifyResultDTO resultDTO = JSON.parseObject(JSON.toJSONString(authenticationDTO.getResult()), IdOcrVerifyResultDTO.class);
         log.info("身份证OCR结果->{},result->{}",reason,resultDTO);
-        if ("成功".equals(reason)){
-            ExchangeUserCertificatesOcrInfo info = insertCertificatesOcrInfo(resultDTO, 1,"", idImageFront, idImageBack);
-            //请求接口
-            String REAL_NAME_AUTHENTICATION_KEY = "";
-            String REAL_NAME_AUTHENTICATION_URL = "";
-            IdentityAuthenticationDTO authenticationDTO1 = restTemplate.exchange(
-                    REAL_NAME_AUTHENTICATION_URL+
-                            "?key="+ REAL_NAME_AUTHENTICATION_KEY+
-                            "&idcard="+ resultDTO.getIdcard()+
-                            "&realname="+resultDTO.getRealname()+
-                            "&orderid=1",
-                    HttpMethod.GET,
-                    null,
-                    new ParameterizedTypeReference<IdentityAuthenticationDTO>() {
-                    }).getBody();
-            String reason1 = authenticationDTO1.getReason();
-            RealNameAuthenticationResultDTO resultDTO1 = JSON.parseObject(JSON.toJSONString(authenticationDTO1.getResult()), RealNameAuthenticationResultDTO.class);
-            log.info("身份证认证结果->{},result->{}",reason1,resultDTO1);
-            if ("成功".equals(reason1)){
-                insertRealNameAuthenticationResult(resultDTO1,1, "",info.getId());
-                if (resultDTO1.getRes().intValue()==1){
-                    return true;
-                }
-                return false;
-            }else{
-                log.error("认证请求失败->{}",reason1);
-            }
-        }else{
+        if (!"成功".equals(reason)){
             log.error("OCR请求失败->{}",reason);
+            return false;
         }
-
+        HttpHeaders requestHeaders1 = new HttpHeaders();
+        requestHeaders1.add("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+        MultiValueMap<String, String> requestBody1 = new LinkedMultiValueMap<>();
+        requestBody1.add("key",ID_CARD_OCR_IDENTIFICATION_KEY);
+        requestBody1.add("image",encode);
+        requestBody1.add("side","back");
+        HttpEntity<MultiValueMap> requestEntity1 = new HttpEntity<>(requestBody1, requestHeaders1);
+        IdentityAuthenticationDTO authenticationBackDTO = restTemplate.exchange(
+                ID_CARD_OCR_IDENTIFICATION_URL,
+                HttpMethod.POST,
+                requestEntity1,
+                new ParameterizedTypeReference<IdentityAuthenticationDTO>() {
+                }).getBody();
+        String reason1 = authenticationBackDTO.getReason();
+        IdOcrVerifyBackResultDTO resultBackDTO = JSON.parseObject(JSON.toJSONString(authenticationDTO.getResult()), IdOcrVerifyBackResultDTO.class);
+        if (!"成功".equals(reason1)){
+            log.error("OCR背面请求失败->{}",reason);
+            return false;
+        }
+        if (resultBackDTO.getBegin()==null){
+            log.error("OCR背面请求失败,签发日期识别为空");
+            return false;
+        }
+        ExchangeUserCertificatesOcrInfo info = insertCertificatesOcrInfo(resultDTO, 1,"", idImageFront, idImageBack);
+        //请求接口
+        String REAL_NAME_AUTHENTICATION_KEY = "";
+        String REAL_NAME_AUTHENTICATION_URL = "";
+        IdentityAuthenticationDTO authenticationDTO1 = restTemplate.exchange(
+                REAL_NAME_AUTHENTICATION_URL+
+                        "?key="+ REAL_NAME_AUTHENTICATION_KEY+
+                        "&idcard="+ resultDTO.getIdcard()+
+                        "&realname="+resultDTO.getRealname()+
+                        "&orderid=1",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<IdentityAuthenticationDTO>() {
+                }).getBody();
+        String authenticationDTO1Reason = authenticationDTO1.getReason();
+        RealNameAuthenticationResultDTO resultDTO1 = JSON.parseObject(JSON.toJSONString(authenticationDTO1.getResult()), RealNameAuthenticationResultDTO.class);
+        log.info("身份证认证结果->{},result->{}",authenticationDTO1Reason,resultDTO1);
+        if ("成功".equals(authenticationDTO1Reason)){
+            log.error("认证请求失败->{}",authenticationDTO1Reason);
+            return  false;
+        }
+        insertRealNameAuthenticationResult(resultDTO1,1, "",info.getId());
+        if (resultDTO1.getRes().intValue()==1){
+            return true;
+        }
         return false;
     }
 
